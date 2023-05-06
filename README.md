@@ -1,2 +1,6 @@
-# pastebin-telegram
-Telegram bot to automate pastebin paste creation with customization implemented in Go.
+# LeetBot
+Telegram bot implemented in Go that:
+- shows user stats
+- fetches daily problem
+- fetches random problem of selected difficulty
+- ???

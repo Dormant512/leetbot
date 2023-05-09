@@ -10,8 +10,7 @@ You can:
 Your choice?`
 
 var aboutText = `This is a simple Telegram bot implemented in _Go_ for an internship in VK.
-It levers the _Telegram Bot API_:
-github.com/go-telegram-bot-api/telegram-bot-api/v5
+It levers the _Telegram Bot API_.
 Are you interested in the _source code_?`
 
 var requestTask = `query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int, $filters: QuestionListFilterInput) {

@@ -153,7 +153,7 @@ func main() {
 				}
 
 				promptName = false
-				url := "https://github.com/" + username + "/"
+				url := "https://leetcode.com/" + username + "/"
 				cbd := "main"
 				thisMenu := urlMenu
 				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"

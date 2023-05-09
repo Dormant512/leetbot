@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 var mainMenu = tgbotapi.NewInlineKeyboardMarkup(
@@ -54,73 +55,6 @@ var aboutMenu = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "main")),
 )
 
-var greet = `Hello, I am a utility LeetCode bot.
-You can:
-- view your LeetCode stats,
-- solve the daily task,
-- pick a random one,
-- read about the bot.
-Your choice?`
-
-var aboutText = `This is a simple Telegram bot implemented in Go for an internship in VK.
-It levers the Telegram Bot API:
-github.com/go-telegram-bot-api/telegram-bot-api/v5
-Are you interested in the source code?`
-
-//var requestDaily string = `query questionOfToday {
-//   activeDailyCodingChallengeQuestion {
-//       date
-//       userStatus
-//       link
-//       question {
-//           acRate
-//           difficulty
-//           freqBar
-//           frontendQuestionId: questionFrontendId
-//           isFavor
-//           paidOnly: isPaidOnly
-//           status
-//           title
-//           titleSlug
-//           hasVideoSolution
-//           hasSolution
-//           topicTags {
-//               name
-//               id
-//               slug
-//           }
-//       }
-//   }
-//}`
-
-var requestUser string = `query getUserProfile($username: String!) {
-	matchedUser(username: $username) {
-		username
-		submitStats: submitStatsGlobal {
-			acSubmissionNum {
-				difficulty
-				count
-				submissions
-			}
-		}
-	}
-}`
-
-type UserData struct {
-	MatchedUser UserStats `json:"matchedUser"`
-}
-
-type UserStats struct {
-	Username    string `json:"username"`
-	SubmitStats struct {
-		AcSubmissionNum []struct {
-			Difficulty  string `json:"difficulty"`
-			Count       int    `json:"count"`
-			Submissions int    `json:"submissions"`
-		} `json:"acSubmissionNum"`
-	} `json:"submitStats"`
-}
-
 func main() {
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("TELEGRAM_APITOKEN"))
 	if err != nil {
@@ -137,7 +71,7 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 	var easyURL, mediumURL, hardURL, dailyURL, userURL string
 	sourceURL := "https://github.com/Dormant512/leetbot"
-	var promptName bool
+	promptName := false
 
 	for update := range updates {
 		if update.CallbackQuery != nil {
@@ -150,44 +84,53 @@ func main() {
 				// Handle user stats
 				promptName = true
 				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Enter username:")
+				msg.ParseMode = tgbotapi.ModeMarkdown
 				bot.Send(msg)
 
 			case "daily":
 				// Handle daily task
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "DAILY HERE.")
-				msg.ReplyMarkup = dailyMenu
-				bot.Send(msg)
+				var respData DailyData
+				ctx := context.Background()
+				client := graphql.NewClient("https://leetcode.com/graphql")
+				req := graphql.NewRequest(requestDaily)
+				err := client.Run(ctx, req, &respData)
+
+				dailyText := "Daily task for " + time.Now().Format("02.01.2006") + " *not* found."
+				if err == nil && respData.ActiveDailyCodingChallengeQuestion.Date != "" {
+					task := respData.ActiveDailyCodingChallengeQuestion
+					q := task.Question
+					dailyText = "*Daily task for " + task.Date + "*\n\n" + q.Title + "\n\n*Difficulty*: " + q.Difficulty
+					dailyText += "\n" + "*Acceptance rate*: " + strconv.FormatFloat(q.AcRate, 'f', 0, 64)
+					dailyText += "%\n" + "*Tags*:"
+					for _, val := range q.TopicTags {
+						dailyText += "\n‣ " + val.Name
+					}
+				}
+				postMessage(update, dailyText, dailyMenu, bot)
 
 			case "random":
 				// Handle random task
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Pick difficulty:")
-				msg.ReplyMarkup = randomMenu
-				bot.Send(msg)
+				postMessage(update, "Pick difficulty:", randomMenu, bot)
 
 			case "about":
 				// Handle about the bot
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, aboutText)
-				msg.ReplyMarkup = aboutMenu
-				bot.Send(msg)
+				postMessage(update, aboutText, aboutMenu, bot)
 
 			// SECOND LEVEL MENU
 			case "easy":
 				// Handle easy task
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "EASY HERE.")
-				msg.ReplyMarkup = easyMenu
-				bot.Send(msg)
+				easyMessage := HandleTask("easy")
+				postMessage(update, easyMessage, easyMenu, bot)
 
 			case "medium":
 				// Handle medium task
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "MEDIUM HERE.")
-				msg.ReplyMarkup = mediumMenu
-				bot.Send(msg)
+				mediumMessage := HandleTask("medium")
+				postMessage(update, mediumMessage, mediumMenu, bot)
 
 			case "hard":
 				// Handle hard task
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "HARD HERE.")
-				msg.ReplyMarkup = hardMenu
-				bot.Send(msg)
+				hardMessage := HandleTask("hard")
+				postMessage(update, hardMessage, hardMenu, bot)
 
 			case "go2user":
 				// Handle user URL
@@ -215,9 +158,7 @@ func main() {
 
 			case "main":
 				// Handle back to main
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Your choice?")
-				msg.ReplyMarkup = mainMenu
-				bot.Send(msg)
+				postMessage(update, "Your choice?", mainMenu, bot)
 
 			default:
 				log.Printf("Unknown callback query: %s", callback)
@@ -235,28 +176,36 @@ func main() {
 
 				statText := "User " + username + " not found."
 				if err == nil && respData.MatchedUser.Username != "" {
-					statText = "Stats for user " + respData.MatchedUser.Username
+					statText = "*Stats for user " + respData.MatchedUser.Username + "*\n"
 					for _, val := range respData.MatchedUser.SubmitStats.AcSubmissionNum {
-						statText += "\n" + val.Difficulty + ": " + strconv.Itoa(val.Count) + " tasks"
+						statText += "\n*" + val.Difficulty + "*: " + strconv.Itoa(val.Count) + " tasks"
 					}
 				}
 
 				promptName = false
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, statText)
-				msg.ReplyMarkup = statsMenu
-				bot.Send(msg)
+				postMessage(update, statText, statsMenu, bot)
 				continue
 			}
 			if update.Message.Text == "/start" {
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, greet)
-				msg.ReplyMarkup = mainMenu
-				bot.Send(msg)
+				postMessage(update, greet, mainMenu, bot)
 				continue
 			}
 
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Your choice?")
-			msg.ReplyMarkup = mainMenu
-			bot.Send(msg)
+			postMessage(update, "Your choice?", mainMenu, bot)
 		}
 	}
+}
+
+func postMessage(update tgbotapi.Update, message string, menu tgbotapi.InlineKeyboardMarkup, bot *tgbotapi.BotAPI) {
+	var msg tgbotapi.MessageConfig
+	if update.CallbackQuery != nil {
+		msg = tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, message)
+	} else if update.Message != nil {
+		msg = tgbotapi.NewMessage(update.Message.Chat.ID, message)
+	} else {
+		return
+	}
+	msg.ReplyMarkup = menu
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	bot.Send(msg)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/machinebox/graphql"
 	"log"
@@ -18,11 +17,6 @@ var mainMenu = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("About", "about")),
 )
 
-var statsMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View on Leetcode", "go2user")),
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "main")),
-)
-
 var randomMenu = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Easy", "easy")),
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Medium", "medium")),
@@ -30,29 +24,9 @@ var randomMenu = tgbotapi.NewInlineKeyboardMarkup(
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "main")),
 )
 
-var easyMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View on Leetcode", "go2easy")),
+var urlMenu = tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("GOTO URL", "go2url")),
 	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "random")),
-)
-
-var mediumMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View on Leetcode", "go2medium")),
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "random")),
-)
-
-var hardMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View on Leetcode", "go2hard")),
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "random")),
-)
-
-var dailyMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View on Leetcode", "go2daily")),
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "main")),
-)
-
-var aboutMenu = tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("View source", "go2source")),
-	tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Back", "main")),
 )
 
 func main() {
@@ -67,10 +41,7 @@ func main() {
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-
 	updates := bot.GetUpdatesChan(u)
-	var easyURL, mediumURL, hardURL, dailyURL, userURL string
-	sourceURL := "https://github.com/Dormant512/leetbot"
 	promptName := false
 
 	for update := range updates {
@@ -96,17 +67,25 @@ func main() {
 				err := client.Run(ctx, req, &respData)
 
 				dailyText := "Daily task for " + time.Now().Format("02.01.2006") + " *not* found."
-				if err == nil && respData.ActiveDailyCodingChallengeQuestion.Date != "" {
-					task := respData.ActiveDailyCodingChallengeQuestion
-					q := task.Question
-					dailyText = "*Daily task for " + task.Date + "*\n\n" + q.Title + "\n\n*Difficulty*: " + q.Difficulty
-					dailyText += "\n" + "*Acceptance rate*: " + strconv.FormatFloat(q.AcRate, 'f', 0, 64)
-					dailyText += "%\n" + "*Tags*:"
-					for _, val := range q.TopicTags {
-						dailyText += "\n‣ " + val.Name
-					}
+				if err != nil || respData.ActiveDailyCodingChallengeQuestion.Date == "" {
+					continue
 				}
-				postMessage(update, dailyText, dailyMenu, bot)
+				task := respData.ActiveDailyCodingChallengeQuestion
+				q := task.Question
+				dailyText = "*Daily task for " + task.Date + "*\n\n" + q.Title + "\n\n*Difficulty*: " + q.Difficulty
+				dailyText += "\n" + "*Acceptance rate*: " + strconv.FormatFloat(q.AcRate, 'f', 0, 64)
+				dailyText += "%\n" + "*Tags*:"
+				for _, val := range q.TopicTags {
+					dailyText += "\n‣ " + val.Name
+				}
+
+				url := "https://leetcode.com/problems/" + q.TitleSlug + "/"
+				cbd := "main"
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				thisMenu.InlineKeyboard[1][0].CallbackData = &cbd
+				postMessage(update, dailyText, thisMenu, bot)
 
 			case "random":
 				// Handle random task
@@ -114,47 +93,38 @@ func main() {
 
 			case "about":
 				// Handle about the bot
-				postMessage(update, aboutText, aboutMenu, bot)
+				url := "https://github.com/Dormant512/leetbot"
+				cbd := "main"
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View source on GitHub"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				thisMenu.InlineKeyboard[1][0].CallbackData = &cbd
+				postMessage(update, aboutText, thisMenu, bot)
 
 			// SECOND LEVEL MENU
 			case "easy":
 				// Handle easy task
-				easyMessage := HandleTask("easy")
-				postMessage(update, easyMessage, easyMenu, bot)
+				mes, url := HandleTask("easy")
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				postMessage(update, mes, thisMenu, bot)
 
 			case "medium":
 				// Handle medium task
-				mediumMessage := HandleTask("medium")
-				postMessage(update, mediumMessage, mediumMenu, bot)
+				mes, url := HandleTask("medium")
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				postMessage(update, mes, thisMenu, bot)
 
 			case "hard":
 				// Handle hard task
-				hardMessage := HandleTask("hard")
-				postMessage(update, hardMessage, hardMenu, bot)
-
-			case "go2user":
-				// Handle user URL
-				fmt.Println("Went to user " + userURL)
-
-			case "go2easy":
-				// Handle easy URL
-				fmt.Println("Went to user " + easyURL)
-
-			case "go2medium":
-				// Handle medium URL
-				fmt.Println("Went to user " + mediumURL)
-
-			case "go2hard":
-				// Handle hard URL
-				fmt.Println("Went to user " + hardURL)
-
-			case "go2daily":
-				// Handle daily URL
-				fmt.Println("Went to user " + dailyURL)
-
-			case "go2source":
-				// Handle source URL
-				fmt.Println("Went to user " + sourceURL)
+				mes, url := HandleTask("hard")
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				postMessage(update, mes, thisMenu, bot)
 
 			case "main":
 				// Handle back to main
@@ -183,7 +153,18 @@ func main() {
 				}
 
 				promptName = false
-				postMessage(update, statText, statsMenu, bot)
+				url := "https://github.com/" + username + "/"
+				cbd := "main"
+				thisMenu := urlMenu
+				thisMenu.InlineKeyboard[0][0].Text = "View on Leetcode"
+				thisMenu.InlineKeyboard[0][0].URL = &url
+				thisMenu.InlineKeyboard[1][0].CallbackData = &cbd
+
+				if err != nil || respData.MatchedUser.Username == "" {
+					thisMenu.InlineKeyboard = thisMenu.InlineKeyboard[1:]
+				}
+
+				postMessage(update, statText, thisMenu, bot)
 				continue
 			}
 			if update.Message.Text == "/start" {

@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-func HandleTask(dif string) string {
+func HandleTask(dif string) (string, string) {
 	var respData TaskData
 	var numData NumData
 	limit := 100
@@ -80,7 +80,8 @@ func HandleTask(dif string) string {
 	for _, val := range thisTask.TopicTags {
 		taskText += "\n‣ " + val.Name
 	}
-	return taskText
+	thisUrl := "https://leetcode.com/problems/" + thisTask.TitleSlug + "/"
+	return taskText, thisUrl
 }
 
 func TakeBinCheckDif(totalTasks, limit int, respData TaskData, dif string) (bool, TaskData) {

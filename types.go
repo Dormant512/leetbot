@@ -34,25 +34,27 @@ type DailyData struct {
 }
 
 type DailyTask struct {
-	Date       string `json:"date"`
-	UserStatus string `json:"userStatus"`
-	Link       string `json:"link"`
-	Question   struct {
-		AcRate             float64 `json:"acRate"`
-		Difficulty         string  `json:"difficulty"`
-		FrontendQuestionId string  `json:"frontendQuestionId"`
-		IsFavor            bool    `json:"isFavor"`
-		PaidOnly           bool    `json:"paidOnly"`
-		Title              string  `json:"title"`
-		TitleSlug          string  `json:"titleSlug"`
-		HasVideoSolution   bool    `json:"hasVideoSolution"`
-		HasSolution        bool    `json:"hasSolution"`
-		TopicTags          []struct {
-			Name string `json:"name"`
-			Id   string `json:"id"`
-			Slug string `json:"slug"`
-		} `json:"topicTags"`
-	} `json:"question"`
+	Date       string        `json:"date"`
+	UserStatus string        `json:"userStatus"`
+	Link       string        `json:"link"`
+	Question   DailyQuestion `json:"question"`
+}
+
+type DailyQuestion struct {
+	AcRate             float64 `json:"acRate"`
+	Difficulty         string  `json:"difficulty"`
+	FrontendQuestionId string  `json:"frontendQuestionId"`
+	IsFavor            bool    `json:"isFavor"`
+	PaidOnly           bool    `json:"paidOnly"`
+	Title              string  `json:"title"`
+	TitleSlug          string  `json:"titleSlug"`
+	HasVideoSolution   bool    `json:"hasVideoSolution"`
+	HasSolution        bool    `json:"hasSolution"`
+	TopicTags          []struct {
+		Name string `json:"name"`
+		Id   string `json:"id"`
+		Slug string `json:"slug"`
+	} `json:"topicTags"`
 }
 
 type UserData struct {
